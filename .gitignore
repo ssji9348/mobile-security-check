@@ -1,0 +1,21 @@
+# APK 원본 (용량이 크므로 git에 포함하지 않음)
+apk_list/*/*.apk
+
+# 디컴파일 결과 (재생성 가능)
+apk_list/*/smali/
+apk_list/*/smali_classes*/
+apk_list/*/res/
+apk_list/*/lib/
+apk_list/*/AndroidManifest.xml
+apk_list/*/apktool.yml
+
+# 도구 바이너리 (직접 다운로드)
+apktool.jar
+platform-tools/
+
+# 보고서는 포함 (점검 결과 공유용)
+# report/ 는 gitignore하지 않음
+
+# OS
+.DS_Store
+Thumbs.db

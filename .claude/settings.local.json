@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(java:*)",
+      "Bash(platform-tools/adb.exe devices:*)",
+      "Bash(platform-tools/adb.exe shell:*)",
+      "Bash(platform-tools/adb.exe pull:*)",
+      "Bash(MSYS_NO_PATHCONV=1 platform-tools/adb.exe pull:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(frida-ps:*)",
+      "Bash(strings:*)",
+      "Bash(unzip:*)"
+    ]
+  }
+}
