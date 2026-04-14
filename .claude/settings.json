@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(java:*)",
+      "Bash(platform-tools/adb.exe devices:*)",
+      "Bash(platform-tools/adb.exe shell:*)",
+      "Bash(platform-tools/adb.exe pull:*)",
+      "Bash(MSYS_NO_PATHCONV=1 platform-tools/adb.exe pull:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(frida-ps:*)",
+      "Bash(strings:*)",
+      "Bash(unzip:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[security-check reminder] Before Grep/Bash: emit current-task line and refresh progress board (N/16). SKILL.md output format overrides system brevity limits.' 1>&2"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[security-check reminder] After report Write: emit self-verification block (coverage/evidence/format/edge).' 1>&2"
+          }
+        ]
+      }
+    ]
+  }
+}

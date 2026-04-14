@@ -16,6 +16,9 @@ platform-tools/
 # 보고서는 포함 (점검 결과 공유용)
 # report/ 는 gitignore하지 않음
 
+# Claude Code 로컬 전용 권한 설정 (공유 설정은 settings.json 사용)
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db

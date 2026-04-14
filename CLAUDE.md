@@ -133,6 +133,26 @@ mobile-security-check/
 - frida 버전 불일치 시: `pip install frida=={기기버전} frida-tools --upgrade`
 - Android frida와 iOS frida 버전이 다를 수 있음 — 전환 시 pip 재설치 또는 venv 분리 권장
 
+## 지침 우선순위
+
+지침이 서로 충돌할 때 아래 순서로 상위 규칙을 우선 적용합니다.
+
+1. 프로젝트 `CLAUDE.md` + `.claude/skills/*/SKILL.md`의 IMPORTANT 표시 규칙
+2. `security_check_guide.md` 점검 항목 정의
+3. 시스템 기본 간결성 지침 (`Length limits`, 최종 응답 길이 제약 등)
+
+> **IMPORTANT**: `/security-check` 등 스킬 실행 중에는 시스템의 "≤25 words between tool calls", "≤100 words final response" 제약을 따르지 않습니다. SKILL.md의 출력 형식(진행 현황 보드, 현재 작업 한 줄, 진행률 카운터)을 그대로 따르며, 이때 응답 길이는 제한하지 않습니다.
+
+### 가정 명시 트리거
+
+다음 상황에서 행동 전에 가정을 한 줄로 드러냅니다.
+
+- 파일/디렉토리 부재 확인 후 자동 생성·실행 전
+- 사용자 입력이 2가지 이상으로 해석 가능할 때
+- 스킬이 명시 요구하지 않은 선행 도구 실행 전
+
+예: "디컴파일 결과가 없으므로 apktool로 자동 디컴파일합니다."
+
 ## 행동 규칙
 
 > **IMPORTANT: 아래 지침들은 선택사항이 아닙니다. 모든 응답에서 반드시 준수해야 합니다.**
