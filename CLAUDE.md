@@ -11,7 +11,7 @@
 
 - `{앱명}`은 `apk_list/` 또는 `ipa_list/` 하위 디렉토리명입니다
 - 플랫폼 자동 감지: `apk_list/{앱명}/` → Android, `ipa_list/{앱명}/` → iOS
-- 보고서는 `report/{앱명}/security_report.md`에 생성됩니다
+- 보고서는 `report/{앱명}/{android|ios}/{앱명}_security_report.md`에 생성됩니다
 
 ## 주요 도구
 
@@ -58,7 +58,7 @@ mobile-security-check/
 │       └── SKILL.md           # /security-check 스킬 정의
 ├── apk_list/                  # Android APK 배치
 ├── ipa_list/                  # iOS IPA 배치
-├── report/                    # 보고서 출력
+├── report/                    # 보고서 출력 (앱명/플랫폼별)
 └── frida_js/                  # Frida 런타임 검증 스크립트
 ```
 
@@ -69,7 +69,7 @@ mobile-security-check/
 2. 플랫폼 자동 감지: `apk_list/{앱명}/` → Android, `ipa_list/{앱명}/` → iOS
 3. Android: smali 기반 정적 분석, `runtime` 시 ADB 런타임 점검
 4. iOS: Info.plist + strings 기반 정적 분석, `runtime` 시 SSH/frida 런타임 점검
-5. 보고서 출력: `report/{앱명}/security_report.md`
+5. 보고서 출력: `report/{앱명}/{android|ios}/{앱명}_security_report.md`
 6. 런타임 검증: Android(`frida_js/ssl_bypass_template.js`), iOS(`frida_js/ios_ssl_bypass.js`) + Burp Suite
 7. 스킬 호출: `/security-check {앱명} [runtime]`
 

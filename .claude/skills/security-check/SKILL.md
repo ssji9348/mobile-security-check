@@ -44,7 +44,7 @@ allowed-tools: Read Grep Glob Bash Edit Write Agent TaskCreate TaskUpdate AskUse
 예:
 - `🔄 현재 작업: 0단계 사전 확인 — APK 디컴파일 중`
 - `🔄 현재 작업: 2단계 정적 분석 — 항목 12 약한 암호 알고리즘 검색 중`
-- `🔄 현재 작업: 3단계 보고서 작성 — security_report.md 생성 중`
+- `🔄 현재 작업: 3단계 보고서 작성 — {앱명}_security_report.md 생성 중`
 
 ### 2. 진행 현황 보드
 
@@ -286,7 +286,7 @@ $ADB install "$APK"
 ```
 
 ### 3단계: 보고서 작성
-- 출력: `report/{앱명}/security_report.md`
+- 출력: `report/{앱명}/android/{앱명}_security_report.md`
 - `runtime` 미포함 시: 앱 정보 → 요약 테이블(16항목) → 항목별 상세 → 종합 의견
 - `runtime` 포함 시: 앱 정보 → 요약 테이블(20항목) → 항목별 상세(정적 + 런타임) → 종합 의견
 - 런타임 점검 한계 사항은 해당 항목에 명시 (예: 비루팅 /data/data/ 미확인)
@@ -486,7 +486,7 @@ ls -la /tmp/*{키워드}* 2>/dev/null
 - AskUserQuestion으로 사용자에게 동일 질문 (오동작, 오탈자, 잘못된 링크, 기타)
 
 ### 3단계: 보고서 작성 (iOS)
-- 출력: `report/{앱명}/security_report.md`
+- 출력: `report/{앱명}/ios/{앱명}_security_report.md`
 - 형식은 Android와 동일하되, iOS 특화 정보 포함:
   - 플랫폼: iOS
   - Bundle ID (패키지명 대신)

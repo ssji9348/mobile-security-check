@@ -55,7 +55,7 @@ claude
 
 실행 시 플랫폼(Android/iOS)을 선택하면, 해당 플랫폼에 맞는 분석이 자동 수행됩니다.
 
-보고서가 `report/{앱이름}/security_report.md`에 자동 생성됩니다.
+보고서가 `report/{앱이름}/{android|ios}/{앱이름}_security_report.md`에 자동 생성됩니다.
 
 ## 점검 항목 (20개)
 
