@@ -342,81 +342,97 @@ $ADB install "$APK"
 
 ### 0단계: 사전 요구사항 확인
 
-iOS 앱 점검 시작 전, AskUserQuestion으로 다음을 확인:
+iOS 앱 점검 시작 전, AskUserQuestion으로 다음을 수집/확인:
 
-1. **SSH 접속 정보**: 기기 IP, SSH 포트, 계정, 비밀번호
-2. **frida-server 상태**: 기기에서 실행 중인지, 버전
-3. **PC frida 버전**: 기기 frida-server와 메이저 버전 일치 여부
-4. **SSH 터널**: `ssh -L 27042:127.0.0.1:27042 {계정}@{IP} -p {포트}` 연결 상태
+1. **연결 모드 분기 (필수 분기 질문)**:
+   - (a) **iproxy/USB 터널** → SSH는 `localhost:2222`, frida는 USB(`frida.get_usb_device()`)
+   - (b) **Wi-Fi 직접** → SSH는 `{기기 IP}:22`, frida는 SSH 터널 후 remote(`add_remote_device('127.0.0.1:27042')`)
+2. **SSH 접속 정보**: 호스트, 포트, 계정, 비밀번호 — `MSC_SSH_HOST` / `MSC_SSH_PORT` / `MSC_SSH_USER` / `MSC_SSH_PW` 환경변수에 주입하거나 도구 `--host/--port/--user/--password` 인자로 전달. **자격증명은 어떠한 산출물(코드/보고서/로그)에도 평문 저장하지 않습니다.**
+3. **frida-server 상태**: 기기에서 실행 중인지, 버전
+4. **PC frida 버전**: 기기 frida-server와 메이저 버전 일치 여부
+5. **SSH 터널 (Wi-Fi 모드 시)**: `ssh -L 27042:127.0.0.1:27042 {계정}@{IP} -p {포트}` 연결 상태
 
-미충족 시 아래 가이드 안내:
+미충족 시 안내:
 - frida 버전 불일치: `pip install frida=={기기버전} frida-tools --upgrade`
 - SSH 터널 미설정: 터널 명령 제공
 - frida-server 미실행: 기기에서 확인 방법 안내
+- **Windows 환경 주의**: OpenSSH는 sshpass 부재로 비밀번호 자동화 불가 → 본 스킬의 모든 SSH 작업은 paramiko 기반 헬퍼(`tools/ssh_pull_app.py`, `tools/ssh_runtime_snapshot.py`)로 수행
 
 ### 0.5단계: IPA 추출 및 분석 준비
 
-`ipa_list/{앱명}/` 디렉토리에 추출 결과가 없으면:
+`ipa_list/{앱명}/Payload/` 디렉토리에 추출 결과가 없으면 아래 절차 진행.
 
-1. AskUserQuestion으로 **Bundle ID** 확인: "점검 대상 앱의 Bundle ID를 입력해주세요. SSH 터널 상태에서 `frida-ps -H 127.0.0.1:27042 -ai`로 확인 가능합니다."
-2. 확인한 Bundle ID로 아래 방법 A → 실패 시 방법 B 순서로 IPA 추출
+**1) Bundle ID 후보 수집**
 
-> 0단계에서 수집한 SSH 접속 정보(IP, 포트, 계정, 비밀번호)를 변수로 사용.
-> 모든 명령에서 하드코딩하지 않음.
-
-**방법 A: frida-ios-dump (DRM 해제, 기본)**
-
-실행 전 `tools/frida-ios-dump/dump.py`의 SSH 설정을 사용자 환경에 맞게 임시 수정:
-```python
-# dump.py 35~38행을 0단계에서 수집한 값으로 수정
-User = '{계정}'
-Password = '{비밀번호}'
-Host = '{IP}'
-Port = {SSH포트}
+```bash
+frida-ps -H 127.0.0.1:27042 -ai   # Wi-Fi 모드(SSH 터널)
+# 또는
+frida-ps -U -ai                   # USB 모드
 ```
 
-SSH 터널 연결 상태에서 실행:
+> ⚠️ **한글 앱명은 mojibake로 깨질 수 있음**(`���ѹα���ȸ` 형태). Bundle ID 컬럼만 신뢰하고, 매칭 가능한 후보가 둘 이상이면 AskUserQuestion으로 사용자에게 후보 리스트를 제시해 선택받습니다.
+
+**2) 방법 A — frida-ios-dump (DRM 해제, 기본 선택)**
+
+연결 모드(USB/Remote)에 따라 dump.py를 자동 패치:
+
+| 연결 모드 | 패치 항목 |
+|---|---|
+| USB | `User`/`Password`/`Host`/`Port`만 수정 (기본 `get_usb_iphone()` 유지) |
+| Wi-Fi | 위 4개 + `get_usb_iphone()` 함수를 `frida.get_device_manager().add_remote_device('127.0.0.1:27042')` 반환으로 교체 |
+
+실행:
 ```bash
 cd tools/frida-ios-dump
 python dump.py {bundle_id}
-# 추출된 IPA를 ipa_list/{앱명}/으로 이동
 mv {앱명}.ipa ../../ipa_list/{앱명}/
 ```
 
-실행 후 dump.py를 원본으로 복원:
-```python
-User = 'root'
-Password = 'alpine'
-Host = 'localhost'
-Port = 2222
+**실패 시그널 (방법 B로 전환)**:
+- stdout/stderr에 `timeout was reached` 출력
+- 5분 이상 진행 없음
+- "Start the target app ..." 후 무응답 → anti-frida 가능성
+
+> ⚠️ 방법 A 실행으로 dump.py가 in-place 수정됩니다. **`tools/frida-ios-dump/`는 `.gitignore`에 등록하여 수정본이 저장소에 포함되지 않도록 합니다.**
+
+**3) 방법 B — SSH 직접 복사 (paramiko 기반 헬퍼)**
+
+`mobile` 계정으로는 `/var/containers/Bundle/Application/`에 직접 접근 불가하므로 sudo + tar + chown 후 SFTP 전송하는 헬퍼 사용:
+
+```bash
+set MSC_SSH_HOST=...  &&  set MSC_SSH_PORT=...  &&  set MSC_SSH_USER=...  &&  set MSC_SSH_PW=...
+python tools/ssh_pull_app.py {bundle_id} "ipa_list/{앱명}"
 ```
 
-**방법 A 실패 시 → 방법 B: SSH 직접 복사 (fallback)**
-```bash
-# 1. 기기에서 .app 경로 찾기
-ssh {계정}@{IP} -p {SSH포트} "find /var/containers/Bundle/Application/ -name '*.app' -maxdepth 2" | grep {키워드}
+헬퍼 동작:
+1. paramiko로 SSH 접속
+2. `/var/containers/Bundle/Application/*/*.app`에서 Bundle ID 매칭 (Info.plist를 base64로 받아 `plistlib`로 파싱 — **plutil 미존재 환경(palera1n 등) 대응**)
+3. `which tar` → `/var/jb/usr/bin/tar` → `/usr/bin/tar` 순으로 tar 바이너리 자동 탐색
+4. sudo + tar로 .app 패키징 → chown → SFTP 다운로드 → 로컬 `Payload/{앱}.app/`으로 압축 해제
+5. **추출 후 SC_Info 디렉토리 자동 검출** → 존재 시 "DRM v2 미해제" 경고 + 보고서에 한계 메모
 
-# 2. 기기에서 .app 번들을 zip으로 패키징
-ssh {계정}@{IP} -p {SSH포트} "rm -rf /tmp/Payload; mkdir -p /tmp/Payload && cp -r '/var/containers/Bundle/Application/{UUID}/{앱}.app' /tmp/Payload/ && cd /tmp && zip -r {앱명}.ipa Payload/"
+> ⚠️ 방법 B 산출물은 DRM 미해제 상태입니다. 메인 바이너리 본문이 암호화되어 strings 검출이 헤더/심볼 영역으로 제한될 수 있으며, 이는 항목 3·12·13·16 결과에 영향을 줄 수 있습니다.
 
-# 3. PC로 전송
-scp -P {SSH포트} {계정}@{IP}:/tmp/{앱명}.ipa ipa_list/{앱명}/
+**4) 산출물 .gitignore 확인**
+
+다음은 자동으로 무시되어야 합니다 (`.gitignore`):
 ```
-
-> **주의**: 방법 B는 DRM이 해제되지 않은 상태로 복사됨.
-> `strings` 분석은 가능하지만, 암호화된 바이너리일 경우 일부 문자열이 누락될 수 있음.
-
-**추출 후 IPA 압축 해제:**
-```bash
-cd ipa_list/{앱명}
-unzip {앱명}.ipa
-# → Payload/{앱}.app/ 하위에 바이너리, plist, 리소스 등
+ipa_list/*/Payload/
+ipa_list/*/*.ipa
+ipa_list/*/*.tar
+ipa_list/*/*.strings.txt
+report/
+tools/frida-ios-dump/
+tools/ssh_debug*.py
+.env
 ```
 
 ### 1단계: 앱 기본 정보 수집 (iOS)
-- `Payload/{앱}.app/Info.plist` → Bundle ID, 버전, 빌드, MinimumOSVersion
-- `Payload/{앱}.app/embedded.mobileprovision` → 프로비저닝 정보 (있을 경우)
-- 바이너리 파일 크기, 아키텍처 확인
+- `Payload/{앱}.app/Info.plist` → Bundle ID, 버전, 빌드, MinimumOSVersion, ATS 설정, URL Scheme
+- `Payload/{앱}.app/embedded.mobileprovision` → 프로비저닝 정보. **부재가 흔함**(App Store 빌드/DRM 미해제) — 부재 자체를 취약 처리하지 말 것
+- 바이너리 파일 크기, 아키텍처 (`file` 또는 Mach-O 헤더)
+- `Payload/{앱}.app/Frameworks/*.framework/` 디렉토리명으로 외부 프레임워크 1차 분류
+- `Payload/{앱}.app/SC_Info/` 존재 → DRM 미해제 플래그 (보고서 한계 섹션에 자동 명시)
 
 ### 2단계: iOS 정적 분석 (16개 항목)
 
@@ -433,10 +449,17 @@ unzip {앱명}.ipa
 - 항목 1: `.app/` 내 비정상 파일 (실행 바이너리, 스크립트, 숨김 파일)
 - Frameworks/ 내 서드파티 프레임워크 목록
 
-**바이너리 문자열 분석 (`strings` 명령, 병렬):**
+**바이너리 문자열 분석 (Windows 호환, 병렬):**
+
+`strings`가 PATH에 있으면 그대로 사용, 없으면 `tools/extract_strings.py`(ASCII + UTF-16LE 폴백) 사용:
 ```bash
-strings "ipa_list/{앱명}/Payload/{앱}.app/{바이너리}" > /tmp/{앱명}_strings.txt
+# 우선순위 1
+strings "ipa_list/{앱명}/Payload/{앱}.app/{바이너리}" > "ipa_list/{앱명}/{앱명}.strings.txt"
+
+# 우선순위 2 (Windows MINGW 등 strings 미설치 환경)
+python tools/extract_strings.py "ipa_list/{앱명}/Payload/{앱}.app/{바이너리}" "ipa_list/{앱명}/{앱명}.strings.txt"
 ```
+출력 위치는 `ipa_list/{앱명}/{앱명}.strings.txt`로 표준화 (`.gitignore` 처리 대상).
 - 항목 3 (악성행위): `NSTask`, `posix_spawn`, `dlopen`, `system(`, 백그라운드 모드
 - 항목 4 (외부유출): `http://`, `https://`, IP 주소 패턴, 하드코딩 URL
 - 항목 6 (탈옥탐지): `/Applications/Cydia`, `/usr/sbin/sshd`, `/bin/bash`, `canOpenURL`, `stat("/`
@@ -463,20 +486,31 @@ strings "ipa_list/{앱명}/Payload/{앱}.app/{바이너리}" > /tmp/{앱명}_str
 - 사용자에게 기기에서 앱 삭제 → 재설치 → 삭제 → 재설치 수행 요청
 - 각 단계 결과를 AskUserQuestion으로 수집
 
-**항목 18 — 앱 삭제 후 안전성 (SSH 기반):**
-```bash
-# SSH에서 실행 (root 권한)
-# 삭제 전 스냅샷
-find /var/mobile/Containers/Data/Application/ -name "*{키워드}*" 2>/dev/null
+**항목 18 — 앱 삭제 후 안전성 (SSH 기반, paramiko 헬퍼):**
 
-# 사용자에게 앱 삭제 요청 후
-# 삭제 후 잔존 파일 확인
-find /var/mobile/Containers/Data/Application/ -name "*{키워드}*" 2>/dev/null
-find /var/mobile/Documents/ -name "*{키워드}*" 2>/dev/null
-ls -la /tmp/*{키워드}* 2>/dev/null
+`tools/ssh_runtime_snapshot.py`로 BEFORE/AFTER 비교. 헬퍼는 Bundle/Data Container를 `.com.apple.mobile_container_manager.metadata.plist`로 매핑하고, 키워드 잔존을 분류 출력합니다.
+
+```bash
+# 삭제 전 스냅샷
+python tools/ssh_runtime_snapshot.py {bundle_id}
+
+# 사용자에게 앱 삭제 요청 후 동일 명령으로 AFTER 측정
+python tools/ssh_runtime_snapshot.py {bundle_id}
 ```
-- iOS는 탈옥 기기이므로 `/var/mobile/` 전체 접근 가능
-- 잔존 파일 없음 → **양호**, 발견 → **취약**
+
+**잔존 분류 → 판정 매트릭스 (자동 분류 결과 적용):**
+
+| 잔존 위치 | 헬퍼 분류 | 판정 |
+|---|---|---|
+| `/var/containers/Bundle/Application/{UUID}/` | `APP-BUNDLE` | 잔존 시 **취약 (높음)** |
+| `/var/mobile/Containers/Data/Application/{UUID}/` | `APP-DATA` | 잔존 시 **취약 (중간)** |
+| `/var/mobile/Library/Logs/CrashReporter/{앱}-*.ips` | `SYSTEM-META` | **양호** (OS CrashReporter, 단 민감정보 별도 검토) |
+| `/var/mobile/Containers/Data/InternalDaemon/.../InstallJournal/{bid}.*.notejournal` | `SYSTEM-META` | **양호** (LaunchServices 데몬 메타) |
+| `/private/var/tmp/Payload/`, `/private/var/tmp/{앱}.tar` | `ARTIFACT` | **무관** (점검자 추출 부산물) |
+| `/var/mobile/Documents/*.ipa`, `Library/Filza/.Trash/*` | `USER-FILE` | **무관** (사용자 다운로드/휴지통) |
+| 그 외 | `OTHER` | 수동 검토 |
+
+**판정 규칙**: AFTER에서 `APP-BUNDLE` 또는 `APP-DATA` 분류가 0건이면 양호. 그 외 분류만 남으면 한계 메모와 함께 양호.
 
 **항목 20 — 자원고갈 (부분 자동화):**
 - 사용자에게 앱 5~10분 사용 요청
@@ -487,11 +521,25 @@ ls -la /tmp/*{키워드}* 2>/dev/null
 
 ### 3단계: 보고서 작성 (iOS)
 - 출력: `report/{앱명}/ios/{앱명}_security_report.md`
+- **`report/`는 `.gitignore` 처리됨** (식별 정보 포함 가능). 외부 공유 시 별도 마스킹 후 배포.
 - 형식은 Android와 동일하되, iOS 특화 정보 포함:
   - 플랫폼: iOS
   - Bundle ID (패키지명 대신)
   - MinimumOSVersion (minSdkVersion 대신)
   - ATS 설정 (usesCleartextTraffic 대신)
+
+**개인정보/식별정보 마스킹 가이드 (보고서에 포함 시)**:
+| 종류 | 원본 예 | 마스킹 권장 |
+|---|---|---|
+| SSH IP | `10.229.202.143` | `<device-IP>` 또는 `192.168.x.x` |
+| Bundle/Data UUID | `9920D8FA-9E65-...` | `<bundle-uuid>` / `<data-uuid>` |
+| 점검자 계정/PW | `mobile/alpine` | 보고서에 기재하지 않음 |
+| 다른 앱 흔적(.ipa 경로 등) | 사용자 다운로드 IPA 목록 | 점검 대상과 무관 시 제외 |
+
+**DRM 미해제 시 자동 삽입 문구 ("점검 한계" 섹션)**:
+> 본 점검은 FairPlay DRM 미해제 IPA(SSH 직접 복사 추출본) 기반으로 수행되었습니다. 메인 바이너리 본문이 암호화되어 strings 기반 검출이 헤더/심볼 영역으로 제한됩니다. 항목 3·12·13·16 결과는 이 한계의 영향을 받을 수 있습니다.
+
+strings 기반 양호 판정 항목(3, 12, 13, 16)은 결과 라벨에 `(DRM 한계)` 태그를 부여합니다.
 
 ### 4단계: 런타임 검증 안내 (iOS)
 - Frida SSL bypass: `frida_js/ios_ssl_bypass.js`

@@ -13,8 +13,24 @@ apk_list/*/apktool.yml
 apktool.jar
 platform-tools/
 
-# 보고서는 포함 (점검 결과 공유용)
-# report/ 는 gitignore하지 않음
+# iOS 추출물 (재생성 가능 + 저작권/DRM)
+ipa_list/*/Payload/
+ipa_list/*/*.ipa
+ipa_list/*/*.tar
+ipa_list/*/*.strings.txt
+
+# 점검 보고서 (식별 정보·기기 UUID·사설 IP 포함 가능 → 공개 저장소 미포함)
+report/
+
+# frida-ios-dump 외부 서브트리 (in-place 수정 흔적이 남을 수 있음)
+tools/frida-ios-dump/
+
+# 일회성 디버그 스크립트 (식별 정보 하드코딩 가능)
+tools/ssh_debug*.py
+
+# 환경 자격증명
+.env
+*.env.local
 
 # Claude Code 로컬 전용 권한 설정 (공유 설정은 settings.json 사용)
 .claude/settings.local.json
